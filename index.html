@@ -6,7 +6,6 @@
 
 <title>FLASH ANZAN</title>
 
-<!-- レトロフォント -->
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 
 <style>
@@ -27,27 +26,38 @@ body {
   border-bottom: 2px solid #00ff00;
 }
 
-/* 点滅 */
-.blink {
-  animation: blink 1s infinite;
-}
-@keyframes blink {
-  50% { opacity: 0; }
-}
-
-/* メイン画面 */
+/* 固定枠 */
 .main {
-  flex: 1;
+  width: 300px;
+  height: 200px;
+  margin: 20px auto;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 4px solid #00ff00;
-  margin: 10px;
 }
 
-/* 数字 */
-#number {
+/* ゴースト表示（位置固定トリック） */
+.display-wrapper {
+  position: relative;
+  width: 220px;
+  height: 80px;
+}
+
+.ghost {
+  color: transparent;
   font-size: 60px;
+  letter-spacing: 10px;
+}
+
+#number {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  font-size: 60px;
+  text-align: center;
+  letter-spacing: 10px;
   text-shadow: 0 0 10px #00ff00;
 }
 
@@ -59,62 +69,47 @@ body {
   gap: 10px;
 }
 
-button, select, input {
+select, input, button {
   background: black;
   color: #00ff00;
   border: 2px solid #00ff00;
-  padding: 12px;
-  font-size: 12px;
+  padding: 10px;
 }
 
 button:active {
   background: #00ff00;
   color: black;
 }
-
-#result {
-  text-align: center;
-  margin-top: 5px;
-}
-
-#history {
-  font-size: 10px;
-  max-height: 120px;
-  overflow-y: auto;
-  border-top: 1px solid #00ff00;
-  margin-top: 10px;
-  padding-top: 5px;
-}
 </style>
 </head>
 
 <body>
 
-<div class="header blink">FLASH ANZAN</div>
+<div class="header">FLASH ANZAN</div>
 
 <div class="main">
-  <div id="number">000</div>
+  <div class="display-wrapper">
+    <div class="ghost">888</div>
+    <div id="number"></div>
+  </div>
 </div>
 
 <div class="controls">
 
-<select id="level">
-  <option value="10">10級</option>
-  <option value="9">9級</option>
-  <option value="8">8級</option>
-  <option value="7">7級</option>
-  <option value="6">6級</option>
-  <option value="5">5級</option>
-  <option value="4">4級</option>
-  <option value="3">3級</option>
-  <option value="2">2級</option>
-  <option value="1">1級</option>
-  <option value="dan1">初段</option>
-  <option value="dan2">二段</option>
-  <option value="dan3">三段</option>
+<label>桁数</label>
+<select id="digit">
+  <option value="1">1桁</option>
+  <option value="2">2桁</option>
+  <option value="3">3桁</option>
 </select>
 
-<button id="startBtn" onclick="start()">START</button>
+<label>口数</label>
+<input type="number" id="count" value="10">
+
+<label>秒数（表示間隔）</label>
+<input type="number" id="speed" step="0.1" value="0.5">
+
+<button onclick="start()">START</button>
 
 <div id="answerArea" style="display:none;">
   <input type="number" id="answer" placeholder="ANS">
@@ -123,109 +118,46 @@ button:active {
 
 <div id="result"></div>
 
-<div id="history"></div>
-
 </div>
 
 <script>
 let numbers = [];
 let index = 0;
 let sum = 0;
-let speed = 800;
-let running = false;
-let audioCtx;
-
-/* 音 */
-function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-}
-
-function beep() {
-  if (!audioCtx) return;
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.frequency.value = 800;
-  gain.gain.value = 0.2;
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  osc.start();
-  osc.stop(audioCtx.currentTime + 0.05);
-}
-
-/* レベル設定 */
-function getLevelConfig(level) {
-  const kyu = {
-    "10": { digit: 1, count: 5, speed: 1200, carry: false },
-    "9":  { digit: 1, count: 6, speed: 1100, carry: false },
-    "8":  { digit: 1, count: 8, speed: 1000, carry: true },
-    "7":  { digit: 2, count: 6, speed: 900,  carry: false },
-    "6":  { digit: 2, count: 8, speed: 800,  carry: true },
-    "5":  { digit: 2, count: 10, speed: 700, carry: true },
-    "4":  { digit: 3, count: 8, speed: 650,  carry: true },
-    "3":  { digit: 3, count: 10, speed: 600, carry: true },
-    "2":  { digit: 3, count: 12, speed: 550, carry: true },
-    "1":  { digit: 3, count: 15, speed: 500, carry: true }
-  };
-
-  const dan = {
-    "dan1": { digit: 3, count: 15, speed: 320, carry: true },
-    "dan2": { digit: 3, count: 18, speed: 300, carry: true },
-    "dan3": { digit: 3, count: 20, speed: 280, carry: true }
-  };
-
-  return kyu[level] || dan[level];
-}
 
 /* 数生成 */
-function generateNumber(current, digit, allowCarry) {
-  let result = 0;
-  let place = 1;
+function generateNumber(digit) {
+  let min = Math.pow(10, digit - 1);
+  let max = Math.pow(10, digit) - 1;
+  if (digit === 1) min = 0;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-  for (let i = 0; i < digit; i++) {
-    let currentDigit = Math.floor(current / place) % 10;
-    let addDigit;
+/* 表示 */
+function displayNumber(num) {
+  const el = document.getElementById("number");
 
-    if (allowCarry) {
-      addDigit = Math.floor(Math.random() * 10);
-    } else {
-      let max = 9 - currentDigit;
-      addDigit = Math.floor(Math.random() * (max + 1));
-    }
-
-    result += addDigit * place;
-    place *= 10;
+  if (num === "" || num === "?") {
+    el.textContent = "";
+  } else {
+    el.textContent = num;
   }
-
-  return result;
 }
 
 /* スタート */
 function start() {
-  if (running) return;
+  numbers = [];
+  index = 0;
+  sum = 0;
 
-  initAudio();
-  running = true;
-
-  document.getElementById("startBtn").disabled = true;
   document.getElementById("answerArea").style.display = "none";
   document.getElementById("result").textContent = "";
 
-  let level = document.getElementById("level").value;
-  let config = getLevelConfig(level);
+  let digit = Number(document.getElementById("digit").value);
+  let count = Number(document.getElementById("count").value);
 
-  speed = config.speed;
-  numbers = [];
-  sum = 0;
-  index = 0;
-
-  for (let i = 0; i < config.count; i++) {
-    let num = generateNumber(sum, config.digit, config.carry);
+  for (let i = 0; i < count; i++) {
+    let num = generateNumber(digit);
     numbers.push(num);
     sum += num;
   }
@@ -236,72 +168,43 @@ function start() {
 /* カウントダウン */
 function countdown(n) {
   if (n > 0) {
-    document.getElementById("number").textContent = n;
+    displayNumber(n);
     setTimeout(() => countdown(n - 1), 800);
   } else {
     setTimeout(showNext, 300);
   }
 }
 
-/* 表示 */
+/* フラッシュ表示 */
 function showNext() {
+  let speed = Number(document.getElementById("speed").value) * 1000;
+
   if (index < numbers.length) {
-    document.getElementById("number").textContent =
-      numbers[index].toString().padStart(3, "0");
-    beep();
-    index++;
-    setTimeout(showNext, speed);
+
+    displayNumber(""); // 一瞬消す
+
+    setTimeout(() => {
+      displayNumber(numbers[index]);
+      index++;
+      setTimeout(showNext, speed);
+    }, 80);
+
   } else {
-    document.getElementById("number").textContent = "???";
+    displayNumber("?");
     document.getElementById("answerArea").style.display = "block";
-    document.getElementById("startBtn").disabled = false;
-    running = false;
   }
-}
-
-/* 履歴保存 */
-function saveScore(level, result) {
-  let history = JSON.parse(localStorage.getItem("history")) || [];
-
-  history.unshift({
-    date: new Date().toLocaleString(),
-    level: level,
-    result: result
-  });
-
-  history = history.slice(0, 10);
-  localStorage.setItem("history", JSON.stringify(history));
-}
-
-/* 履歴表示 */
-function loadHistory() {
-  let history = JSON.parse(localStorage.getItem("history")) || "";
-  let html = "HISTORY<br>";
-
-  history.forEach(h => {
-    html += `${h.level} ${h.result}<br>`;
-  });
-
-  document.getElementById("history").innerHTML = html;
 }
 
 /* 判定 */
 function check() {
   let user = Number(document.getElementById("answer").value);
-  let level = document.getElementById("level").value;
 
   if (user === sum) {
-    document.getElementById("result").innerHTML = ">>> PASS";
-    saveScore(level, "PASS");
+    document.getElementById("result").textContent = "PASS";
   } else {
-    document.getElementById("result").innerHTML = ">>> FAIL<br>ANS:" + sum;
-    saveScore(level, "FAIL");
+    document.getElementById("result").textContent = "FAIL 正解:" + sum;
   }
-
-  loadHistory();
 }
-
-window.onload = loadHistory;
 </script>
 
 </body>
