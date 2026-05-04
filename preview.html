@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>フラッシュ暗算</title>
+
+<style>
+body {
+  margin: 0;
+  background: #111;
+  color: white;
+  font-family: sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  padding: 15px;
+  text-align: center;
+  font-size: 18px;
+  border-bottom: 1px solid #333;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#number {
+  font-size: 80px;
+  font-weight: bold;
+}
+
+.controls {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+select, button, input {
+  padding: 15px;
+  font-size: 18px;
+  border-radius: 10px;
+  border: none;
+}
+
+button {
+  background: #4CAF50;
+  color: white;
+}
+
+button:disabled {
+  background: #555;
+}
+
+#result {
+  text-align: center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">フラッシュ暗算（レベル選択）</div>
+
+<div class="main">
+  <div id="number">-</div>
+</div>
+
+<div class="controls">
+
+  <select id="level">
+    <option value="easy">初級（1桁・ゆっくり）</option>
+    <option value="middle">中級（2桁）</option>
+    <option value="hard">上級（3桁）</option>
+    <option value="dan">段位（高速・高負荷）</option>
+  </select>
+
+  <button id="startBtn" onclick="start()">スタート</button>
+
+  <div id="answerArea" style="display:none;">
+    <input type="number" id="answer" placeholder="答えを入力">
+    <button onclick="check()">答え合わせ</button>
+  </div>
+
+  <div id="result"></div>
+
+</div>
+
+<script>
+let numbers = [];
+let index = 0;
+let sum = 0;
+let speed = 800;
+let running = false;
+
+let audioCtx;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function beep() {
+  if (!audioCtx) return;
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.frequency.value = 900;
+  gain.gain.value = 0.2;
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.05);
+}
+
+/* レベル設定 */
+function getLevelConfig(level) {
+  if (level === "easy") {
+    return { digit: 1, count: 5, speed: 1200, carry: false };
+  }
+  if (level === "middle") {
+    return { digit: 2, count: 8, speed: 800, carry: true };
+  }
+  if (level === "hard") {
+    return { digit: 3, count: 10, speed: 600, carry: true };
+  }
+  if (level === "dan") {
+    return { digit: 4, count: 15, speed: 400, carry: true };
+  }
+}
+
+/* 珠算的生成 */
+function generateNumber(current, digit, allowCarry) {
+  let result = 0;
+  let place = 1;
+
+  for (let i = 0; i < digit; i++) {
+    let currentDigit = Math.floor(current / place) % 10;
+    let addDigit;
+
+    if (allowCarry) {
+      addDigit = Math.floor(Math.random() * 10);
+    } else {
+      let max = 9 - currentDigit;
+      addDigit = Math.floor(Math.random() * (max + 1));
+    }
+
+    result += addDigit * place;
+    place *= 10;
+  }
+
+  return result;
+}
+
+/* スタート */
+function start() {
+  if (running) return;
+
+  initAudio();
+  running = true;
+
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("result").textContent = "";
+  document.getElementById("answerArea").style.display = "none";
+
+  let level = document.getElementById("level").value;
+  let config = getLevelConfig(level);
+
+  speed = config.speed;
+  numbers = [];
+  sum = 0;
+  index = 0;
+
+  for (let i = 0; i < config.count; i++) {
+    let num = generateNumber(sum, config.digit, config.carry);
+    numbers.push(num);
+    sum += num;
+  }
+
+  countdown(3);
+}
+
+/* カウントダウン */
+function countdown(n) {
+  const words = ["", "いち", "に", "さん"];
+
+  if (n > 0) {
+    document.getElementById("number").textContent = n;
+    speak(words[n]);
+    setTimeout(() => countdown(n - 1), 900);
+  } else {
+    setTimeout(showNext, 400);
+  }
+}
+
+function speak(text) {
+  const uttr = new SpeechSynthesisUtterance(text);
+  uttr.lang = "ja-JP";
+  speechSynthesis.speak(uttr);
+}
+
+/* 表示 */
+function showNext() {
+  if (index < numbers.length) {
+    document.getElementById("number").textContent = numbers[index];
+    beep();
+    index++;
+    setTimeout(showNext, speed);
+  } else {
+    document.getElementById("number").textContent = "?";
+    document.getElementById("answerArea").style.display = "block";
+    document.getElementById("startBtn").disabled = false;
+    running = false;
+  }
+}
+
+/* 判定 */
+function check() {
+  let user = Number(document.getElementById("answer").value);
+
+  if (user === sum) {
+    document.getElementById("result").textContent = "正解！";
+  } else {
+    document.getElementById("result").textContent = "不正解 正解：" + sum;
+  }
+}
+</script>
+
+</body>
+</html>
