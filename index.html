@@ -25,7 +25,6 @@ body {
   border-bottom: 2px solid #00ff00;
 }
 
-/* 固定枠 */
 .main {
   width: 300px;
   height: 200px;
@@ -36,7 +35,7 @@ body {
   border: 4px solid #00ff00;
 }
 
-/* ゴースト固定表示 */
+/* ゴースト固定 */
 .display-wrapper {
   position: relative;
   width: 220px;
@@ -60,7 +59,6 @@ body {
   text-shadow: 0 0 10px #00ff00;
 }
 
-/* 操作 */
 .controls {
   padding: 10px;
   display: flex;
@@ -105,7 +103,7 @@ button:active {
 <label>口数（最大15）</label>
 <input type="number" id="count" value="10" min="1" max="15">
 
-<label>秒数（0.1〜1.0）</label>
+<label>秒数（0.1〜1）</label>
 <input type="number" id="speed" step="0.1" value="0.5" min="0.1" max="1">
 
 <button onclick="start()">START</button>
@@ -123,6 +121,38 @@ button:active {
 let numbers = [];
 let index = 0;
 let sum = 0;
+let audioCtx;
+
+/* 音初期化（重要） */
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+/* ピ音 */
+function beep() {
+  if (!audioCtx) return;
+
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.frequency.value = 800;
+  gain.gain.value = 0.2;
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.05);
+}
+
+/* カウントダウン音声 */
+function speak(text) {
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = "ja-JP";
+  speechSynthesis.speak(utter);
+}
 
 /* 数生成 */
 function generateNumber(digit) {
@@ -135,16 +165,13 @@ function generateNumber(digit) {
 /* 表示 */
 function displayNumber(num) {
   const el = document.getElementById("number");
-
-  if (num === "" || num === "?") {
-    el.textContent = "";
-  } else {
-    el.textContent = num;
-  }
+  el.textContent = (num === "" || num === "?") ? "" : num;
 }
 
 /* スタート */
 function start() {
+  initAudio(); // ←超重要
+
   numbers = [];
   index = 0;
   sum = 0;
@@ -156,7 +183,6 @@ function start() {
   let count = Number(document.getElementById("count").value);
   let speed = Number(document.getElementById("speed").value);
 
-  // 制限
   count = Math.min(Math.max(count, 1), 15);
   speed = Math.min(Math.max(speed, 0.1), 1);
 
@@ -176,22 +202,29 @@ function start() {
 function countdown(n) {
   if (n > 0) {
     displayNumber(n);
+
+    // 音声
+    if (n === 3) speak("さん");
+    if (n === 2) speak("に");
+    if (n === 1) speak("いち");
+
     setTimeout(() => countdown(n - 1), 800);
   } else {
     setTimeout(showNext, 300);
   }
 }
 
-/* フラッシュ表示 */
+/* 表示 */
 function showNext() {
   let speed = Number(document.getElementById("speed").value) * 1000;
 
   if (index < numbers.length) {
 
-    displayNumber(""); // 消す
+    displayNumber("");
 
     setTimeout(() => {
       displayNumber(numbers[index]);
+      beep(); // ←音
       index++;
       setTimeout(showNext, speed);
     }, 80);
