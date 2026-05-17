@@ -2,47 +2,38 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>楽譜ピアノゲーム</title>
+<title>ピアノゲーム</title>
 
 <style>
+
 body{
     margin:0;
     background:#111;
-    overflow:hidden;
-    font-family:sans-serif;
     color:white;
     text-align:center;
-}
-
-h1{
-    margin:10px;
+    font-family:sans-serif;
 }
 
 canvas{
     background:#222;
+    border:3px solid white;
     display:block;
     margin:auto;
-    border:3px solid white;
-}
-
-#info{
-    margin:10px;
-    font-size:24px;
 }
 
 #keyboard{
-    width:600px;
-    margin:20px auto;
     display:flex;
+    justify-content:center;
+    margin-top:20px;
 }
 
 .key{
-    width:120px;
-    height:180px;
+    width:100px;
+    height:160px;
     background:white;
-    border:2px solid black;
     color:black;
-    line-height:180px;
+    border:2px solid black;
+    line-height:160px;
     font-size:40px;
     font-weight:bold;
 }
@@ -50,6 +41,7 @@ canvas{
 .active{
     background:orange !important;
 }
+
 </style>
 </head>
 
@@ -57,40 +49,35 @@ canvas{
 
 <h1>🎹 楽譜ピアノゲーム</h1>
 
-<div id="info">
-SCORE: <span id="score">0</span>
-</div>
+<h2>SCORE: <span id="score">0</span></h2>
 
-<canvas id="gameCanvas" width="1000" height="400"></canvas>
+<canvas id="canvas" width="1000" height="400"></canvas>
 
 <div id="keyboard">
-    <div class="key" id="key0">A</div>
-    <div class="key" id="key1">S</div>
-    <div class="key" id="key2">D</div>
-    <div class="key" id="key3">F</div>
-    <div class="key" id="key4">G</div>
+<div class="key" id="k0">A</div>
+<div class="key" id="k1">S</div>
+<div class="key" id="k2">D</div>
+<div class="key" id="k3">F</div>
+<div class="key" id="k4">G</div>
 </div>
 
 <script>
 
-const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-
-const scoreText = document.getElementById("score");
-
-let score = 0;
-
-const hitX = 180;
 
 const keys = ["a","s","d","f","g"];
 
-const noteNames = ["ド","レ","ミ","ファ","ソ"];
-
-const frequencies = [261,293,329,349,392];
+const freqs = [261,293,329,349,392];
 
 const noteY = [250,230,210,190,170];
 
-const audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+let score = 0;
+
+const scoreText = document.getElementById("score");
+
+const audioCtx =
+new(window.AudioContext || window.webkitAudioContext)();
 
 function playSound(freq){
 
@@ -98,7 +85,6 @@ function playSound(freq){
     const gain = audioCtx.createGain();
 
     osc.frequency.value = freq;
-    osc.type = "sine";
 
     osc.connect(gain);
     gain.connect(audioCtx.destination);
@@ -116,112 +102,84 @@ function playSound(freq){
 }
 
 let notes = [
-    {x:1000,note:0},
-    {x:1200,note:1},
-    {x:1400,note:2},
-    {x:1600,note:3},
-    {x:1800,note:4},
-    {x:2000,note:2},
-    {x:2200,note:1},
-    {x:2400,note:0},
+    {x:1000,n:0},
+    {x:1200,n:1},
+    {x:1400,n:2},
+    {x:1600,n:3},
+    {x:1800,n:4},
 ];
 
 function drawStaff(){
 
     ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
 
-    for(let i=0; i<5; i++){
+    for(let i=0;i<5;i++){
 
-        let y = 150 + i * 25;
+        let y = 150 + i*25;
 
         ctx.beginPath();
         ctx.moveTo(0,y);
-        ctx.lineTo(canvas.width,y);
+        ctx.lineTo(1000,y);
         ctx.stroke();
     }
-}
-
-function drawHitLine(){
-
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = 4;
-
-    ctx.beginPath();
-    ctx.moveTo(hitX,100);
-    ctx.lineTo(hitX,320);
-    ctx.stroke();
 }
 
 function drawNotes(){
 
     ctx.fillStyle = "cyan";
 
-    notes.forEach(n=>{
+    notes.forEach(note=>{
 
         ctx.beginPath();
+
         ctx.ellipse(
-            n.x,
-            noteY[n.note],
+            note.x,
+            noteY[note.n],
             18,
-            13,
+            12,
             0,
             0,
             Math.PI*2
         );
 
         ctx.fill();
-
-        ctx.fillStyle = "white";
-
-        ctx.font = "18px sans-serif";
-
-        ctx.fillText(
-            noteNames[n.note],
-            n.x - 10,
-            noteY[n.note] - 25
-        );
-
-        ctx.fillStyle = "cyan";
     });
 }
 
 function updateNotes(){
 
-    notes.forEach(n=>{
+    notes.forEach(note=>{
 
-        n.x -= 4;
+        note.x -= 4;
     });
-
-    notes = notes.filter(n=> n.x > -100);
 }
 
-function draw(){
+function drawHitLine(){
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.strokeStyle = "red";
+
+    ctx.beginPath();
+    ctx.moveTo(180,100);
+    ctx.lineTo(180,320);
+    ctx.stroke();
+}
+
+function loop(){
+
+    ctx.clearRect(0,0,1000,400);
 
     drawStaff();
 
     drawHitLine();
 
     drawNotes();
-}
-
-function update(){
 
     updateNotes();
+
+    requestAnimationFrame(loop);
 }
 
-function gameLoop(){
-
-    update();
-
-    draw();
-
-    requestAnimationFrame(gameLoop);
-}
-
-document.addEventListener("keydown", e=>{
+document.addEventListener("keydown",e=>{
 
     const key = e.key.toLowerCase();
 
@@ -230,26 +188,24 @@ document.addEventListener("keydown", e=>{
     if(lane === -1) return;
 
     document
-        .getElementById("key"+lane)
+        .getElementById("k"+lane)
         .classList.add("active");
 
     setTimeout(()=>{
 
         document
-            .getElementById("key"+lane)
+            .getElementById("k"+lane)
             .classList.remove("active");
 
-    },120);
+    },100);
 
-    playSound(frequencies[lane]);
+    playSound(freqs[lane]);
 
-    for(let i=0; i<notes.length; i++){
-
-        const n = notes[i];
+    for(let i=0;i<notes.length;i++){
 
         if(
-            n.note === lane &&
-            Math.abs(n.x - hitX) < 40
+            notes[i].n === lane &&
+            Math.abs(notes[i].x - 180) < 40
         ){
 
             score += 100;
@@ -258,12 +214,12 @@ document.addEventListener("keydown", e=>{
 
             notes.splice(i,1);
 
-            return;
+            break;
         }
     }
 });
 
-gameLoop();
+loop();
 
 </script>
 
